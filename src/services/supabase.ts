@@ -17,6 +17,8 @@ export interface GameRoom {
   status: 'lobby' | 'playing' | 'finished';
   game_state: {
     players?: Player[];
+    phase?: 'LOBBY' | 'PET_SELECT' | 'DICE_ROLL' | 'PLAYING' | 'REVEAL' | 'GAME_OVER';
+    selectedPetId?: string;
   };
 }
 
@@ -66,6 +68,21 @@ export const updateRoomPlayers = async (roomId: string, players: Player[]) => {
     .from('game_rooms')
     .update({ game_state: { players }, updated_at: new Date().toISOString() })
     .eq('id', roomId);
+
+  if (error) throw error;
+};
+
+export const updateRoomGameState = async (room: GameRoom, updates: Partial<GameRoom['game_state']>) => {
+  if (!supabase) throw new Error('Supabase is not configured yet. Add your .env.local values.');
+
+  const { error } = await supabase
+    .from('game_rooms')
+    .update({
+      game_state: { ...room.game_state, ...updates },
+      status: updates.phase === 'PLAYING' ? 'playing' : undefined,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', room.id);
 
   if (error) throw error;
 };

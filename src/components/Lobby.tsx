@@ -14,6 +14,7 @@ interface LobbyProps {
   onCreateRoom: () => void;
   onJoinRoom: (roomCode: string) => void;
   isOnlineRoom: boolean;
+  isRoomHost: boolean;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -28,6 +29,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onCreateRoom,
   onJoinRoom,
   isOnlineRoom,
+  isRoomHost,
   isMuted,
   onToggleMute,
 }) => {
@@ -293,10 +295,11 @@ export const Lobby: React.FC<LobbyProps> = ({
               sound.playClick();
               onStart();
             }}
-            className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white text-xl font-black rounded-2xl shadow-lg shadow-orange-300/50 flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            disabled={isOnlineRoom && !isRoomHost}
+            className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-400 disabled:shadow-none text-white text-xl font-black rounded-2xl shadow-lg shadow-orange-300/50 flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:cursor-not-allowed"
           >
             <Sparkles className="w-6 h-6 text-yellow-200 animate-pulse" />
-            <span>Select Your Pet & Play!</span>
+            <span>{isOnlineRoom && !isRoomHost ? 'Waiting for Host' : 'Select Your Pet & Play!'}</span>
             <Play className="w-6 h-6 fill-white" />
           </button>
         </div>

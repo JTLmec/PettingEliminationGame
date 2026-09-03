@@ -23,6 +23,7 @@ import {
   isSupabaseConfigured,
   subscribeToRoom,
   updateRoomPlayers,
+  updateRoomGameState,
   GameRoom,
 } from './services/supabase';
 
@@ -91,6 +92,8 @@ export const App: React.FC = () => {
     return playerId;
   };
 
+  const isRoomHost = !room || room.host_player_id === window.localStorage.getItem('petting-player-id');
+
   useEffect(() => {
     const roomCode = new URLSearchParams(window.location.search).get('room')
       ?? window.localStorage.getItem('petting-room-code');
@@ -106,9 +109,13 @@ export const App: React.FC = () => {
           : [...roomPlayers, { ...players[0], id: playerId, isBot: false }];
 
         if (!existingPlayer) await updateRoomPlayers(foundRoom.id, joinedPlayers);
-        const joinedRoom = { ...foundRoom, game_state: { players: joinedPlayers } };
+        const joinedRoom = { ...foundRoom, game_state: { ...foundRoom.game_state, players: joinedPlayers } };
         setRoom(joinedRoom);
         setPlayers(joinedPlayers);
+        if (foundRoom.game_state.selectedPetId && foundRoom.game_state.selectedPetId in PETS) {
+          setSelectedPetId(foundRoom.game_state.selectedPetId as PetId);
+        }
+        if (foundRoom.game_state.phase) setPhase(foundRoom.game_state.phase);
         window.localStorage.setItem('petting-room-code', foundRoom.room_code);
         window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
       })
@@ -120,6 +127,10 @@ export const App: React.FC = () => {
     const applyRoomUpdate = (updatedRoom: GameRoom) => {
       setRoom(updatedRoom);
       if (updatedRoom.game_state.players) setPlayers(updatedRoom.game_state.players);
+      if (updatedRoom.game_state.selectedPetId && updatedRoom.game_state.selectedPetId in PETS) {
+        setSelectedPetId(updatedRoom.game_state.selectedPetId as PetId);
+      }
+      if (updatedRoom.game_state.phase) setPhase(updatedRoom.game_state.phase);
     };
     const unsubscribe = subscribeToRoom(room.id, applyRoomUpdate);
     const refreshTimer = window.setInterval(() => {
@@ -219,13 +230,16 @@ export const App: React.FC = () => {
 
   // Start game from lobby -> Go to Pet Select
   const handleLobbyStart = () => {
+    if (!isRoomHost) return;
     setPhase('PET_SELECT');
+    if (room) void updateRoomGameState(room, { phase: 'PET_SELECT' });
   };
 
   // Pet confirmed -> Go to Dice Roll
   const handlePetSelected = (petId: PetId) => {
     setSelectedPetId(petId);
     setPhase('DICE_ROLL');
+    if (room) void updateRoomGameState(room, { phase: 'DICE_ROLL', selectedPetId: petId });
   };
 
   // Dice roll complete -> Initialize match and start playing
@@ -425,17 +439,28 @@ export const App: React.FC = () => {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           isOnlineRoom={room !== null}
+          isRoomHost={isRoomHost}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
         />
       )}
 
       {/* 2. PET SELECTOR PHASE */}
-      {phase === 'PET_SELECT' && (
+      {phase === 'PET_SELECT' && isRoomHost && (
         <PetSelector
           onSelectPet={handlePetSelected}
           onBackToLobby={() => setPhase('LOBBY')}
         />
+      )}
+
+      {phase === 'PET_SELECT' && !isRoomHost && (
+        <div className="min-h-[70vh] flex items-center justify-center text-center px-4">
+          <div className="bg-white rounded-3xl p-8 shadow-xl border border-amber-200 max-w-md">
+            <div className="text-5xl mb-4">🐾</div>
+            <h2 className="text-2xl font-black text-slate-800 mb-2">Waiting for the host</h2>
+            <p className="text-slate-500 font-medium">The room creator is choosing which pet everyone will play.</p>
+          </div>
+        </div>
       )}
 
       {/* 3. DICE ROLL INITIATIVE MODAL */}
