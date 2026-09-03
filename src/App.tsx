@@ -17,6 +17,7 @@ import { PetVisualizer } from './components/PetVisualizer';
 import { OutcomeModal } from './components/OutcomeModal';
 import { VictoryScreen } from './components/VictoryScreen';
 import { sound } from './services/audio';
+import { RotateCcw } from 'lucide-react';
 import {
   createGameRoom,
   findGameRoom,
@@ -190,6 +191,12 @@ export const App: React.FC = () => {
     setSelectorPlayerId(null);
     setPhase('LOBBY');
     window.history.replaceState({}, '', window.location.pathname);
+  };
+
+  const handleResetSession = () => {
+    window.localStorage.removeItem('petting-room-code');
+    window.localStorage.removeItem('petting-player-id');
+    window.location.assign(window.location.pathname);
   };
 
   const setLobbyPlayers: React.Dispatch<React.SetStateAction<Player[]>> = (nextPlayers) => {
@@ -464,6 +471,16 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-amber-50/50 py-4 px-3 flex flex-col items-center">
+      {(room || phase !== 'LOBBY') && (
+        <button
+          onClick={handleResetSession}
+          className="fixed top-3 right-3 z-40 p-2.5 rounded-full bg-white text-slate-700 shadow-md border border-slate-200 hover:bg-rose-50 hover:text-rose-600 transition"
+          title="Reset session and return to main lobby"
+          aria-label="Reset session and return to main lobby"
+        >
+          <RotateCcw className="w-5 h-5" />
+        </button>
+      )}
       {/* 1. LOBBY PHASE */}
       {phase === 'LOBBY' && (
         <Lobby
