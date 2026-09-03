@@ -13,6 +13,7 @@ interface LobbyProps {
   isOnlineConfigured: boolean;
   onCreateRoom: () => void;
   onJoinRoom: (roomCode: string) => void;
+  isOnlineRoom: boolean;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -26,6 +27,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   isOnlineConfigured,
   onCreateRoom,
   onJoinRoom,
+  isOnlineRoom,
   isMuted,
   onToggleMute,
 }) => {
@@ -44,6 +46,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   const setPlayerCount = (count: number) => {
     sound.playClick();
+    if (isOnlineRoom) return;
     if (count > players.length) {
       const newPlayers: Player[] = [...players];
       for (let i = players.length; i < count; i++) {
@@ -68,6 +71,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   const togglePlayerBot = (index: number) => {
     sound.playClick();
+    if (isOnlineRoom) return;
     setPlayers((prev) => {
       const updated = [...prev];
       const nextIsBot = !updated[index].isBot;
@@ -187,7 +191,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800">Player Roster</h2>
-              <p className="text-sm text-slate-500">Pick 2 to 6 contestants (Humans or AI Bots)</p>
+              <p className="text-sm text-slate-500">{isOnlineRoom ? `Players in room: ${players.length}/6` : 'Pick 2 to 6 contestants (Humans or AI Bots)'}</p>
             </div>
           </div>
 

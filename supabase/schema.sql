@@ -12,6 +12,19 @@ create table if not exists public.game_rooms (
 
 create index if not exists game_rooms_room_code_idx on public.game_rooms (room_code);
 
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'game_rooms_max_players'
+      and conrelid = 'public.game_rooms'::regclass
+  ) then
+    alter table public.game_rooms
+      add constraint game_rooms_max_players
+      check (jsonb_array_length(coalesce(game_state->'players', '[]'::jsonb)) <= 6);
+  end if;
+end $$;
+
 alter table public.game_rooms enable row level security;
 
 drop policy if exists "Anyone can read game rooms" on public.game_rooms;

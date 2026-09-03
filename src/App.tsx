@@ -142,6 +142,9 @@ export const App: React.FC = () => {
       window.localStorage.setItem('petting-player-id', playerId);
       const currentPlayer = { ...players[0], id: playerId, isBot: false };
       const roomPlayers = foundRoom.game_state.players ?? [];
+      if (roomPlayers.length >= 6 && !roomPlayers.some((player) => player.id === currentPlayer.id)) {
+        throw new Error('This room is full. The maximum is 6 players.');
+      }
       const updatedPlayers = roomPlayers.some((player) => player.id === currentPlayer.id)
         ? roomPlayers
         : [...roomPlayers, currentPlayer];
@@ -410,6 +413,7 @@ export const App: React.FC = () => {
           isOnlineConfigured={isSupabaseConfigured}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
+          isOnlineRoom={room !== null}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
         />

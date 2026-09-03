@@ -60,6 +60,7 @@ export const findGameRoom = async (roomCode: string): Promise<GameRoom> => {
 
 export const updateRoomPlayers = async (roomId: string, players: Player[]) => {
   if (!supabase) throw new Error('Supabase is not configured yet. Add your .env.local values.');
+  if (players.length > 6) throw new Error('This room is full. The maximum is 6 players.');
 
   const { error } = await supabase
     .from('game_rooms')
