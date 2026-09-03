@@ -31,6 +31,16 @@ export const Lobby: React.FC<LobbyProps> = ({
 }) => {
   const [joinCode, setJoinCode] = React.useState('');
 
+  const handleJoinInput = (value: string) => {
+    try {
+      const parsedUrl = new URL(value);
+      const roomFromUrl = parsedUrl.searchParams.get('room');
+      setJoinCode(roomFromUrl ?? value.toUpperCase());
+    } catch {
+      setJoinCode(value.toUpperCase());
+    }
+  };
+
   const setPlayerCount = (count: number) => {
     sound.playClick();
     if (count > players.length) {
@@ -138,9 +148,8 @@ export const Lobby: React.FC<LobbyProps> = ({
             <div className="flex flex-1 gap-2">
               <input
                 value={joinCode}
-                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
-                placeholder="ROOM CODE"
-                maxLength={8}
+                onChange={(event) => handleJoinInput(event.target.value)}
+                placeholder="ROOM CODE OR LINK"
                 className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-white text-slate-900 font-bold uppercase outline-none"
               />
               <button
