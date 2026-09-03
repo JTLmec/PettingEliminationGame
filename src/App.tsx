@@ -107,10 +107,19 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (!room) return;
-    return subscribeToRoom(room.id, (updatedRoom) => {
+    const applyRoomUpdate = (updatedRoom: GameRoom) => {
       setRoom(updatedRoom);
       if (updatedRoom.game_state.players) setPlayers(updatedRoom.game_state.players);
-    });
+    };
+    const unsubscribe = subscribeToRoom(room.id, applyRoomUpdate);
+    const refreshTimer = window.setInterval(() => {
+      findGameRoom(room.room_code).then(applyRoomUpdate).catch(() => undefined);
+    }, 3000);
+
+    return () => {
+      unsubscribe();
+      window.clearInterval(refreshTimer);
+    };
   }, [room?.id]);
 
   const handleCreateRoom = async () => {
