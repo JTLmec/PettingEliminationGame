@@ -34,6 +34,7 @@ export const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [onlineError, setOnlineError] = useState<string | null>(null);
+  const [selectorPlayerId, setSelectorPlayerId] = useState<string | null>(null);
 
   // Players
   const [players, setPlayers] = useState<Player[]>([
@@ -93,6 +94,7 @@ export const App: React.FC = () => {
   };
 
   const isRoomHost = !room || room.host_player_id === window.localStorage.getItem('petting-player-id');
+  const canSelectPet = !room || selectorPlayerId === window.localStorage.getItem('petting-player-id');
 
   useEffect(() => {
     const roomCode = new URLSearchParams(window.location.search).get('room')
@@ -115,6 +117,7 @@ export const App: React.FC = () => {
         if (foundRoom.game_state.selectedPetId && foundRoom.game_state.selectedPetId in PETS) {
           setSelectedPetId(foundRoom.game_state.selectedPetId as PetId);
         }
+        setSelectorPlayerId(foundRoom.game_state.selectorPlayerId ?? null);
         if (foundRoom.game_state.phase) setPhase(foundRoom.game_state.phase);
         window.localStorage.setItem('petting-room-code', foundRoom.room_code);
         window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
@@ -130,6 +133,7 @@ export const App: React.FC = () => {
       if (updatedRoom.game_state.selectedPetId && updatedRoom.game_state.selectedPetId in PETS) {
         setSelectedPetId(updatedRoom.game_state.selectedPetId as PetId);
       }
+      setSelectorPlayerId(updatedRoom.game_state.selectorPlayerId ?? null);
       if (updatedRoom.game_state.phase) setPhase(updatedRoom.game_state.phase);
     };
     const unsubscribe = subscribeToRoom(room.id, applyRoomUpdate);
@@ -231,28 +235,36 @@ export const App: React.FC = () => {
   // Start game from lobby -> Go to Pet Select
   const handleLobbyStart = () => {
     if (!isRoomHost) return;
-    setPhase('PET_SELECT');
-    if (room) void updateRoomGameState(room, { phase: 'PET_SELECT' });
+    setPhase('DICE_ROLL');
+    if (room) void updateRoomGameState(room, { phase: 'DICE_ROLL' });
   };
 
   // Pet confirmed -> Go to Dice Roll
   const handlePetSelected = (petId: PetId) => {
+    if (!canSelectPet) return;
     setSelectedPetId(petId);
-    setPhase('DICE_ROLL');
-    if (room) void updateRoomGameState(room, { phase: 'DICE_ROLL', selectedPetId: petId });
-  };
-
-  // Dice roll complete -> Initialize match and start playing
-  const handleDiceRollComplete = (orderedPlayers: Player[]) => {
-    const initialSpots = initializeSpotsForPet(selectedPetId);
-    setPlayers(orderedPlayers);
-    setActiveSpots(initialSpots);
+    setActiveSpots(initializeSpotsForPet(petId));
     setActivePlayerIndex(0);
     setPetMood('idle');
     setWinner(null);
     setRevealData(null);
     setPhase('PLAYING');
-    sound.startBgm();
+    if (room) void updateRoomGameState(room, { phase: 'PLAYING', selectedPetId: petId });
+  };
+
+  // Dice roll complete -> Highest roller chooses the pet
+  const handleDiceRollComplete = (orderedPlayers: Player[]) => {
+    setPlayers(orderedPlayers);
+    const diceWinner = orderedPlayers[0];
+    setSelectorPlayerId(diceWinner.id);
+    setPhase('PET_SELECT');
+    if (room) {
+      void updateRoomGameState(room, {
+        players: orderedPlayers,
+        selectorPlayerId: diceWinner.id,
+        phase: 'PET_SELECT',
+      });
+    }
   };
 
   // Active player reference
@@ -446,29 +458,39 @@ export const App: React.FC = () => {
       )}
 
       {/* 2. PET SELECTOR PHASE */}
-      {phase === 'PET_SELECT' && isRoomHost && (
+      {phase === 'PET_SELECT' && canSelectPet && (
         <PetSelector
           onSelectPet={handlePetSelected}
           onBackToLobby={() => setPhase('LOBBY')}
         />
       )}
 
-      {phase === 'PET_SELECT' && !isRoomHost && (
+      {phase === 'PET_SELECT' && !canSelectPet && (
         <div className="min-h-[70vh] flex items-center justify-center text-center px-4">
           <div className="bg-white rounded-3xl p-8 shadow-xl border border-amber-200 max-w-md">
             <div className="text-5xl mb-4">🐾</div>
-            <h2 className="text-2xl font-black text-slate-800 mb-2">Waiting for the host</h2>
-            <p className="text-slate-500 font-medium">The room creator is choosing which pet everyone will play.</p>
+            <h2 className="text-2xl font-black text-slate-800 mb-2">Waiting for the dice winner</h2>
+            <p className="text-slate-500 font-medium">The player with the highest roll is choosing which pet everyone will play.</p>
           </div>
         </div>
       )}
 
       {/* 3. DICE ROLL INITIATIVE MODAL */}
-      {phase === 'DICE_ROLL' && (
+      {phase === 'DICE_ROLL' && isRoomHost && (
         <DiceRollModal
           players={players}
           onCompleteRoll={handleDiceRollComplete}
         />
+      )}
+
+      {phase === 'DICE_ROLL' && !isRoomHost && (
+        <div className="min-h-[70vh] flex items-center justify-center text-center px-4">
+          <div className="bg-white rounded-3xl p-8 shadow-xl border border-amber-200 max-w-md">
+            <div className="text-5xl mb-4">🎲</div>
+            <h2 className="text-2xl font-black text-slate-800 mb-2">The host is rolling</h2>
+            <p className="text-slate-500 font-medium">The highest roll will choose the pet for everyone.</p>
+          </div>
+        </div>
       )}
 
       {/* 4. ACTIVE GAMEPLAY PHASE */}

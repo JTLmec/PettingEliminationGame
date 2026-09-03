@@ -19,6 +19,7 @@ export interface GameRoom {
     players?: Player[];
     phase?: 'LOBBY' | 'PET_SELECT' | 'DICE_ROLL' | 'PLAYING' | 'REVEAL' | 'GAME_OVER';
     selectedPetId?: string;
+    selectorPlayerId?: string;
   };
 }
 
