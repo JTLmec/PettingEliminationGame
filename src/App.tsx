@@ -82,6 +82,15 @@ export const App: React.FC = () => {
 
   const selectedPet: PetData = PETS[selectedPetId];
 
+  const getLocalPlayerId = () => {
+    const storedPlayerId = window.localStorage.getItem('petting-player-id');
+    if (storedPlayerId && !/^p\d+$/.test(storedPlayerId)) return storedPlayerId;
+
+    const playerId = `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    window.localStorage.setItem('petting-player-id', playerId);
+    return playerId;
+  };
+
   useEffect(() => {
     const roomCode = new URLSearchParams(window.location.search).get('room');
     if (!roomCode || !isSupabaseConfigured) return;
@@ -89,9 +98,7 @@ export const App: React.FC = () => {
     findGameRoom(roomCode)
       .then(async (foundRoom) => {
         const roomPlayers = foundRoom.game_state.players ?? [];
-        const storedPlayerId = window.localStorage.getItem('petting-player-id');
-        const playerId = storedPlayerId ?? `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        window.localStorage.setItem('petting-player-id', playerId);
+        const playerId = getLocalPlayerId();
         const existingPlayer = roomPlayers.find((player) => player.id === playerId);
         const joinedPlayers = existingPlayer
           ? roomPlayers
@@ -125,8 +132,8 @@ export const App: React.FC = () => {
   const handleCreateRoom = async () => {
     setOnlineError(null);
     try {
-      window.localStorage.setItem('petting-player-id', players[0].id);
-      const createdRoom = await createGameRoom(players[0]);
+      const host = { ...players[0], id: getLocalPlayerId(), isBot: false };
+      const createdRoom = await createGameRoom(host);
       setRoom(createdRoom);
       window.history.replaceState({}, '', `${window.location.pathname}?room=${createdRoom.room_code}`);
     } catch (error) {
@@ -138,8 +145,7 @@ export const App: React.FC = () => {
     setOnlineError(null);
     try {
       const foundRoom = await findGameRoom(roomCode);
-      const playerId = window.localStorage.getItem('petting-player-id') ?? `player_${Date.now()}`;
-      window.localStorage.setItem('petting-player-id', playerId);
+      const playerId = getLocalPlayerId();
       const currentPlayer = { ...players[0], id: playerId, isBot: false };
       const roomPlayers = foundRoom.game_state.players ?? [];
       if (roomPlayers.length >= 6 && !roomPlayers.some((player) => player.id === currentPlayer.id)) {
