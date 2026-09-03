@@ -32,6 +32,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onToggleMute,
 }) => {
   const [joinCode, setJoinCode] = React.useState('');
+  const [showJoinRoom, setShowJoinRoom] = React.useState(!roomCode);
 
   const handleJoinInput = (value: string) => {
     try {
@@ -140,8 +141,15 @@ export const Lobby: React.FC<LobbyProps> = ({
             >
               Copy invite link
             </button>
+            <button
+              onClick={() => setShowJoinRoom((visible) => !visible)}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm"
+            >
+              Join a room
+            </button>
           </div>
-        ) : (
+        ) : null}
+        {showJoinRoom && (
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={onCreateRoom}

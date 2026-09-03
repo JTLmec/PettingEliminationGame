@@ -92,7 +92,8 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const roomCode = new URLSearchParams(window.location.search).get('room');
+    const roomCode = new URLSearchParams(window.location.search).get('room')
+      ?? window.localStorage.getItem('petting-room-code');
     if (!roomCode || !isSupabaseConfigured) return;
 
     findGameRoom(roomCode)
@@ -108,6 +109,8 @@ export const App: React.FC = () => {
         const joinedRoom = { ...foundRoom, game_state: { players: joinedPlayers } };
         setRoom(joinedRoom);
         setPlayers(joinedPlayers);
+        window.localStorage.setItem('petting-room-code', foundRoom.room_code);
+        window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
       })
       .catch(() => setOnlineError('That room could not be found. Check the room code and try again.'));
   }, []);
@@ -135,6 +138,7 @@ export const App: React.FC = () => {
       const host = { ...players[0], id: getLocalPlayerId(), isBot: false };
       const createdRoom = await createGameRoom(host);
       setRoom(createdRoom);
+      window.localStorage.setItem('petting-room-code', createdRoom.room_code);
       window.history.replaceState({}, '', `${window.location.pathname}?room=${createdRoom.room_code}`);
     } catch (error) {
       setOnlineError(error instanceof Error ? error.message : 'Unable to create a room.');
@@ -159,6 +163,7 @@ export const App: React.FC = () => {
       }
       setRoom({ ...foundRoom, game_state: { players: updatedPlayers } });
       setPlayers(updatedPlayers);
+      window.localStorage.setItem('petting-room-code', foundRoom.room_code);
       window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
     } catch (error) {
       setOnlineError(error instanceof Error ? `Unable to join room: ${error.message}` : 'Unable to join that room.');
