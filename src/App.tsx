@@ -87,9 +87,20 @@ export const App: React.FC = () => {
     if (!roomCode || !isSupabaseConfigured) return;
 
     findGameRoom(roomCode)
-      .then((foundRoom) => {
-        setRoom(foundRoom);
-        if (foundRoom.game_state.players) setPlayers(foundRoom.game_state.players);
+      .then(async (foundRoom) => {
+        const roomPlayers = foundRoom.game_state.players ?? [];
+        const storedPlayerId = window.localStorage.getItem('petting-player-id');
+        const playerId = storedPlayerId ?? `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        window.localStorage.setItem('petting-player-id', playerId);
+        const existingPlayer = roomPlayers.find((player) => player.id === playerId);
+        const joinedPlayers = existingPlayer
+          ? roomPlayers
+          : [...roomPlayers, { ...players[0], id: playerId, isBot: false }];
+
+        if (!existingPlayer) await updateRoomPlayers(foundRoom.id, joinedPlayers);
+        const joinedRoom = { ...foundRoom, game_state: { players: joinedPlayers } };
+        setRoom(joinedRoom);
+        setPlayers(joinedPlayers);
       })
       .catch(() => setOnlineError('That room could not be found. Check the room code and try again.'));
   }, []);
@@ -105,6 +116,7 @@ export const App: React.FC = () => {
   const handleCreateRoom = async () => {
     setOnlineError(null);
     try {
+      window.localStorage.setItem('petting-player-id', players[0].id);
       const createdRoom = await createGameRoom(players[0]);
       setRoom(createdRoom);
       window.history.replaceState({}, '', `${window.location.pathname}?room=${createdRoom.room_code}`);
@@ -117,7 +129,9 @@ export const App: React.FC = () => {
     setOnlineError(null);
     try {
       const foundRoom = await findGameRoom(roomCode);
-      const currentPlayer = { ...players[0], id: `player_${Date.now()}`, isBot: false };
+      const playerId = window.localStorage.getItem('petting-player-id') ?? `player_${Date.now()}`;
+      window.localStorage.setItem('petting-player-id', playerId);
+      const currentPlayer = { ...players[0], id: playerId, isBot: false };
       const roomPlayers = foundRoom.game_state.players ?? [];
       if (roomPlayers.some((player) => player.id === currentPlayer.id)) return;
       const updatedPlayers = [...roomPlayers, currentPlayer];
