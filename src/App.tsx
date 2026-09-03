@@ -133,14 +133,17 @@ export const App: React.FC = () => {
       window.localStorage.setItem('petting-player-id', playerId);
       const currentPlayer = { ...players[0], id: playerId, isBot: false };
       const roomPlayers = foundRoom.game_state.players ?? [];
-      if (roomPlayers.some((player) => player.id === currentPlayer.id)) return;
-      const updatedPlayers = [...roomPlayers, currentPlayer];
-      await updateRoomPlayers(foundRoom.id, updatedPlayers);
+      const updatedPlayers = roomPlayers.some((player) => player.id === currentPlayer.id)
+        ? roomPlayers
+        : [...roomPlayers, currentPlayer];
+      if (updatedPlayers.length !== roomPlayers.length) {
+        await updateRoomPlayers(foundRoom.id, updatedPlayers);
+      }
       setRoom({ ...foundRoom, game_state: { players: updatedPlayers } });
       setPlayers(updatedPlayers);
       window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
     } catch (error) {
-      setOnlineError(error instanceof Error ? error.message : 'Unable to join that room.');
+      setOnlineError(error instanceof Error ? `Unable to join room: ${error.message}` : 'Unable to join that room.');
     }
   };
 
