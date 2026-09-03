@@ -37,7 +37,8 @@ export const Lobby: React.FC<LobbyProps> = ({
       const roomFromUrl = parsedUrl.searchParams.get('room');
       setJoinCode(roomFromUrl ?? value.toUpperCase());
     } catch {
-      setJoinCode(value.toUpperCase());
+      const roomMatch = value.match(/[?&]room=([A-Z0-9]+)/i);
+      setJoinCode((roomMatch?.[1] ?? value).toUpperCase());
     }
   };
 

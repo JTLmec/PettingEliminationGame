@@ -23,6 +23,11 @@ export interface GameRoom {
 const createRoomCode = () =>
   Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 
+const normalizeRoomCode = (value: string) => {
+  const roomMatch = value.match(/[?&]room=([A-Z0-9]+)/i);
+  return (roomMatch?.[1] ?? value).trim().toUpperCase();
+};
+
 export const createGameRoom = async (host: Player): Promise<GameRoom> => {
   if (!supabase) throw new Error('Supabase is not configured yet. Add your .env.local values.');
 
@@ -46,7 +51,7 @@ export const findGameRoom = async (roomCode: string): Promise<GameRoom> => {
   const { data, error } = await supabase
     .from('game_rooms')
     .select('*')
-    .eq('room_code', roomCode.trim().toUpperCase())
+    .eq('room_code', normalizeRoomCode(roomCode))
     .single();
 
   if (error) throw error;
