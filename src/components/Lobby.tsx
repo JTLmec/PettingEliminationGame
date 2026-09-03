@@ -1,7 +1,7 @@
 import React from 'react';
 import { Player } from '../types/game';
 import { AVATARS, PLAYER_COLORS, BOT_NAMES } from '../data/pets';
-import { Users, Bot, User, Play, Sparkles, Volume2, VolumeX, Dice5, Link, LogIn } from 'lucide-react';
+import { Users, Bot, User, Play, Sparkles, Volume2, VolumeX, Dice5, Link, LogIn, LogOut } from 'lucide-react';
 import { sound } from '../services/audio';
 
 interface LobbyProps {
@@ -13,6 +13,7 @@ interface LobbyProps {
   isOnlineConfigured: boolean;
   onCreateRoom: () => void;
   onJoinRoom: (roomCode: string) => void;
+  onLeaveRoom: () => void;
   isOnlineRoom: boolean;
   isRoomHost: boolean;
   isMuted: boolean;
@@ -28,6 +29,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   isOnlineConfigured,
   onCreateRoom,
   onJoinRoom,
+  onLeaveRoom,
   isOnlineRoom,
   isRoomHost,
   isMuted,
@@ -148,6 +150,12 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm"
             >
               Join a room
+            </button>
+            <button
+              onClick={onLeaveRoom}
+              className="px-4 py-2 rounded-xl bg-rose-500/90 hover:bg-rose-400 text-white font-black text-sm flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" /> Leave room
             </button>
           </div>
         ) : null}

@@ -185,6 +185,14 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleLeaveRoom = () => {
+    window.localStorage.removeItem('petting-room-code');
+    setRoom(null);
+    setSelectorPlayerId(null);
+    setPhase('LOBBY');
+    window.history.replaceState({}, '', window.location.pathname);
+  };
+
   const setLobbyPlayers: React.Dispatch<React.SetStateAction<Player[]>> = (nextPlayers) => {
     setPlayers((currentPlayers) => {
       const updatedPlayers = typeof nextPlayers === 'function'
@@ -450,6 +458,7 @@ export const App: React.FC = () => {
           isOnlineConfigured={isSupabaseConfigured}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
+          onLeaveRoom={handleLeaveRoom}
           isOnlineRoom={room !== null}
           isRoomHost={isRoomHost}
           isMuted={isMuted}
