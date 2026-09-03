@@ -17,12 +17,22 @@ import { PetVisualizer } from './components/PetVisualizer';
 import { OutcomeModal } from './components/OutcomeModal';
 import { VictoryScreen } from './components/VictoryScreen';
 import { sound } from './services/audio';
+import {
+  createGameRoom,
+  findGameRoom,
+  isSupabaseConfigured,
+  subscribeToRoom,
+  updateRoomPlayers,
+  GameRoom,
+} from './services/supabase';
 
 export const App: React.FC = () => {
   // --- Game State ---
   const [phase, setPhase] = useState<GamePhase>('LOBBY');
   const [selectedPetId, setSelectedPetId] = useState<PetId>('garfield_cat');
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [onlineError, setOnlineError] = useState<string | null>(null);
 
   // Players
   const [players, setPlayers] = useState<Player[]>([
@@ -71,6 +81,64 @@ export const App: React.FC = () => {
   const [winType, setWinType] = useState<'sweet_spot' | 'last_survivor'>('sweet_spot');
 
   const selectedPet: PetData = PETS[selectedPetId];
+
+  useEffect(() => {
+    const roomCode = new URLSearchParams(window.location.search).get('room');
+    if (!roomCode || !isSupabaseConfigured) return;
+
+    findGameRoom(roomCode)
+      .then((foundRoom) => {
+        setRoom(foundRoom);
+        if (foundRoom.game_state.players) setPlayers(foundRoom.game_state.players);
+      })
+      .catch(() => setOnlineError('That room could not be found. Check the room code and try again.'));
+  }, []);
+
+  useEffect(() => {
+    if (!room) return;
+    return subscribeToRoom(room.id, (updatedRoom) => {
+      setRoom(updatedRoom);
+      if (updatedRoom.game_state.players) setPlayers(updatedRoom.game_state.players);
+    });
+  }, [room?.id]);
+
+  const handleCreateRoom = async () => {
+    setOnlineError(null);
+    try {
+      const createdRoom = await createGameRoom(players[0]);
+      setRoom(createdRoom);
+      window.history.replaceState({}, '', `${window.location.pathname}?room=${createdRoom.room_code}`);
+    } catch (error) {
+      setOnlineError(error instanceof Error ? error.message : 'Unable to create a room.');
+    }
+  };
+
+  const handleJoinRoom = async (roomCode: string) => {
+    setOnlineError(null);
+    try {
+      const foundRoom = await findGameRoom(roomCode);
+      const currentPlayer = { ...players[0], id: `player_${Date.now()}`, isBot: false };
+      const roomPlayers = foundRoom.game_state.players ?? [];
+      if (roomPlayers.some((player) => player.id === currentPlayer.id)) return;
+      const updatedPlayers = [...roomPlayers, currentPlayer];
+      await updateRoomPlayers(foundRoom.id, updatedPlayers);
+      setRoom({ ...foundRoom, game_state: { players: updatedPlayers } });
+      setPlayers(updatedPlayers);
+      window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
+    } catch (error) {
+      setOnlineError(error instanceof Error ? error.message : 'Unable to join that room.');
+    }
+  };
+
+  const setLobbyPlayers: React.Dispatch<React.SetStateAction<Player[]>> = (nextPlayers) => {
+    setPlayers((currentPlayers) => {
+      const updatedPlayers = typeof nextPlayers === 'function'
+        ? nextPlayers(currentPlayers)
+        : nextPlayers;
+      if (room) void updateRoomPlayers(room.id, updatedPlayers);
+      return updatedPlayers;
+    });
+  };
 
   // Sound Mute Toggle
   const handleToggleMute = () => {
@@ -309,8 +377,13 @@ export const App: React.FC = () => {
       {phase === 'LOBBY' && (
         <Lobby
           players={players}
-          setPlayers={setPlayers}
+          setPlayers={setLobbyPlayers}
           onStart={handleLobbyStart}
+          roomCode={room?.room_code ?? null}
+          onlineError={onlineError}
+          isOnlineConfigured={isSupabaseConfigured}
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
         />

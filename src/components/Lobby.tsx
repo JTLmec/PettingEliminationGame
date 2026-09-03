@@ -1,13 +1,18 @@
 import React from 'react';
 import { Player } from '../types/game';
 import { AVATARS, PLAYER_COLORS, BOT_NAMES } from '../data/pets';
-import { Users, Bot, User, Play, Sparkles, Volume2, VolumeX, Dice5 } from 'lucide-react';
+import { Users, Bot, User, Play, Sparkles, Volume2, VolumeX, Dice5, Link, LogIn } from 'lucide-react';
 import { sound } from '../services/audio';
 
 interface LobbyProps {
   players: Player[];
   setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
   onStart: () => void;
+  roomCode: string | null;
+  onlineError: string | null;
+  isOnlineConfigured: boolean;
+  onCreateRoom: () => void;
+  onJoinRoom: (roomCode: string) => void;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -16,9 +21,16 @@ export const Lobby: React.FC<LobbyProps> = ({
   players,
   setPlayers,
   onStart,
+  roomCode,
+  onlineError,
+  isOnlineConfigured,
+  onCreateRoom,
+  onJoinRoom,
   isMuted,
   onToggleMute,
 }) => {
+  const [joinCode, setJoinCode] = React.useState('');
+
   const setPlayerCount = (count: number) => {
     sound.playClick();
     if (count > players.length) {
@@ -94,6 +106,55 @@ export const Lobby: React.FC<LobbyProps> = ({
         >
           {isMuted ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />}
         </button>
+      </div>
+
+      <div className="w-full bg-slate-900 text-white rounded-3xl p-5 shadow-xl mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Link className="w-5 h-5 text-amber-300" />
+          <h2 className="font-black text-lg">Play online with friends</h2>
+        </div>
+        {roomCode ? (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <p className="text-xs text-slate-300 mb-1">Share this room code</p>
+              <p className="text-2xl font-black tracking-[0.25em] text-amber-300">{roomCode}</p>
+            </div>
+            <button
+              onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${window.location.pathname}?room=${roomCode}`)}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 font-bold text-sm"
+            >
+              Copy invite link
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={onCreateRoom}
+              disabled={!isOnlineConfigured}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:bg-slate-600 disabled:text-slate-400 text-slate-950 font-black"
+            >
+              Create room
+            </button>
+            <div className="flex flex-1 gap-2">
+              <input
+                value={joinCode}
+                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                placeholder="ROOM CODE"
+                maxLength={8}
+                className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-white text-slate-900 font-bold uppercase outline-none"
+              />
+              <button
+                onClick={() => onJoinRoom(joinCode)}
+                disabled={!isOnlineConfigured || joinCode.length < 4}
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-600 disabled:text-slate-400 text-slate-950 font-black flex items-center gap-2"
+              >
+                <LogIn className="w-4 h-4" /> Join
+              </button>
+            </div>
+          </div>
+        )}
+        {!isOnlineConfigured && <p className="text-xs text-slate-400 mt-3">Add your Supabase values to .env.local to enable online rooms.</p>}
+        {onlineError && <p className="text-xs text-rose-300 mt-3">{onlineError}</p>}
       </div>
 
       {/* Main Title Card */}
