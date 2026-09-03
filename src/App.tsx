@@ -117,6 +117,8 @@ export const App: React.FC = () => {
           setSelectedPetId(foundRoom.game_state.selectedPetId as PetId);
         }
         setSelectorPlayerId(foundRoom.game_state.selectorPlayerId ?? null);
+        if (foundRoom.game_state.activeSpots) setActiveSpots(foundRoom.game_state.activeSpots);
+        if (foundRoom.game_state.activePlayerIndex !== undefined) setActivePlayerIndex(foundRoom.game_state.activePlayerIndex);
         if (foundRoom.game_state.phase) setPhase(foundRoom.game_state.phase);
         window.history.replaceState({}, '', `${window.location.pathname}?room=${foundRoom.room_code}`);
       })
@@ -132,6 +134,8 @@ export const App: React.FC = () => {
         setSelectedPetId(updatedRoom.game_state.selectedPetId as PetId);
       }
       setSelectorPlayerId(updatedRoom.game_state.selectorPlayerId ?? null);
+      if (updatedRoom.game_state.activeSpots) setActiveSpots(updatedRoom.game_state.activeSpots);
+      if (updatedRoom.game_state.activePlayerIndex !== undefined) setActivePlayerIndex(updatedRoom.game_state.activePlayerIndex);
       if (updatedRoom.game_state.phase) setPhase(updatedRoom.game_state.phase);
     };
     const unsubscribe = subscribeToRoom(room.id, applyRoomUpdate);
@@ -245,14 +249,22 @@ export const App: React.FC = () => {
   // Pet confirmed -> Go to Dice Roll
   const handlePetSelected = (petId: PetId) => {
     if (!canSelectPet) return;
+    const freshSpots = initializeSpotsForPet(petId);
     setSelectedPetId(petId);
-    setActiveSpots(initializeSpotsForPet(petId));
+    setActiveSpots(freshSpots);
     setActivePlayerIndex(0);
     setPetMood('idle');
     setWinner(null);
     setRevealData(null);
     setPhase('PLAYING');
-    if (room) void updateRoomGameState(room, { phase: 'PLAYING', selectedPetId: petId });
+    if (room) {
+      void updateRoomGameState(room, {
+        phase: 'PLAYING',
+        selectedPetId: petId,
+        activePlayerIndex: 0,
+        activeSpots: freshSpots,
+      });
+    }
   };
 
   // Dice roll complete -> Highest roller chooses the pet
@@ -272,10 +284,12 @@ export const App: React.FC = () => {
 
   // Active player reference
   const activePlayer = players[activePlayerIndex] || players[0];
+  const canPet = !room || activePlayer.id === window.localStorage.getItem('petting-player-id');
 
   // Execute petting of a spot
   const executePetSpot = useCallback((spot: ActiveSpot) => {
     if (phase !== 'PLAYING') return;
+    if (room && activePlayer.id !== window.localStorage.getItem('petting-player-id')) return;
 
     // Show animated reaching hand
     setReachingCoords({ x: spot.x, y: spot.y });
@@ -382,6 +396,14 @@ export const App: React.FC = () => {
       nextIdx = (nextIdx + 1) % updatedPlayers.length;
     }
     setActivePlayerIndex(nextIdx);
+    if (room) {
+      void updateRoomGameState(room, {
+        players: updatedPlayers,
+        activePlayerIndex: nextIdx,
+        activeSpots,
+        phase: 'PLAYING',
+      });
+    }
   };
 
   // Bot Turn Automation Effect
@@ -514,7 +536,7 @@ export const App: React.FC = () => {
             spots={activeSpots}
             activePlayer={activePlayer}
             onPickSpot={executePetSpot}
-            disabled={activePlayer.isBot || isBotThinking || revealData !== null}
+            disabled={!canPet || activePlayer.isBot || isBotThinking || revealData !== null}
             petMood={petMood}
             reachingCoords={reachingCoords}
           />

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Player } from '../types/game';
+import { ActiveSpot, Player } from '../types/game';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -20,6 +20,8 @@ export interface GameRoom {
     phase?: 'LOBBY' | 'PET_SELECT' | 'DICE_ROLL' | 'PLAYING' | 'REVEAL' | 'GAME_OVER';
     selectedPetId?: string;
     selectorPlayerId?: string;
+    activePlayerIndex?: number;
+    activeSpots?: ActiveSpot[];
   };
 }
 
