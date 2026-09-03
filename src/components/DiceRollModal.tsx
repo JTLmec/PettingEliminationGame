@@ -9,6 +9,7 @@ interface DiceRollModalProps {
 }
 
 export const DiceRollModal: React.FC<DiceRollModalProps> = ({ players, onCompleteRoll }) => {
+  const [rollPlayers] = useState<Player[]>(() => players);
   const [rolling, setRolling] = useState<boolean>(true);
   const [playerRolls, setPlayerRolls] = useState<{ [playerId: string]: number }>({});
   const [isDone, setIsDone] = useState<boolean>(false);
@@ -21,7 +22,7 @@ export const DiceRollModal: React.FC<DiceRollModalProps> = ({ players, onComplet
     // Random roll cycle effect
     const interval = setInterval(() => {
       const tempRolls: { [playerId: string]: number } = {};
-      players.forEach((p) => {
+      rollPlayers.forEach((p) => {
         tempRolls[p.id] = Math.floor(Math.random() * 6) + 1;
       });
       setPlayerRolls(tempRolls);
@@ -37,7 +38,7 @@ export const DiceRollModal: React.FC<DiceRollModalProps> = ({ players, onComplet
       const usedNumbers = new Set<number>();
 
       // Generate distinct roll values (or tie-break automatically)
-      const rolledPlayers = players.map((p, idx) => {
+      const rolledPlayers = rollPlayers.map((p, idx) => {
         let val = Math.floor(Math.random() * 6) + 1;
         // if tie, add fractional tie-break based on unique index
         while (usedNumbers.has(val) && usedNumbers.size < 6) {
@@ -66,7 +67,7 @@ export const DiceRollModal: React.FC<DiceRollModalProps> = ({ players, onComplet
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [players]);
+  }, [rollPlayers]);
 
   const handleProceed = () => {
     sound.playClick();
@@ -91,7 +92,7 @@ export const DiceRollModal: React.FC<DiceRollModalProps> = ({ players, onComplet
 
         {/* Dice Cards for Each Player */}
         <div className="flex flex-col gap-2 sm:gap-3 mb-4 sm:mb-6">
-          {(isDone ? sortedLadder : players).map((player, idx) => {
+          {(isDone ? sortedLadder : rollPlayers).map((player, idx) => {
             const roll = playerRolls[player.id] || 1;
             const isFirst = isDone && idx === 0;
 
