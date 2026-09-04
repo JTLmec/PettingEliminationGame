@@ -89,7 +89,13 @@ export const Lobby: React.FC<LobbyProps> = ({
     });
   };
 
+  const localPlayerId = typeof window !== 'undefined' ? window.localStorage.getItem('petting-player-id') : null;
+
+  const canEditProfile = (player: Player) => !isOnlineRoom || player.id === localPlayerId;
+
   const updatePlayerName = (index: number, name: string) => {
+    const player = players[index];
+    if (!canEditProfile(player)) return;
     setPlayers((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], name };
@@ -98,6 +104,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   const cycleAvatar = (index: number) => {
+    const player = players[index];
+    if (!canEditProfile(player)) return;
     sound.playClick();
     setPlayers((prev) => {
       const updated = [...prev];
@@ -272,8 +280,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                 {/* Avatar Icon */}
                 <button
                   onClick={() => cycleAvatar(idx)}
-                  className="text-3xl p-2 bg-slate-100 hover:bg-amber-100 rounded-2xl transition active:scale-90 border border-slate-200"
-                  title="Click to change avatar"
+                  disabled={!canEditProfile(player)}
+                  className="text-3xl p-2 bg-slate-100 hover:bg-amber-100 rounded-2xl transition active:scale-90 border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={canEditProfile(player) ? 'Click to change avatar' : 'Locked to this player profile'}
                 >
                   {player.avatar}
                 </button>
@@ -285,10 +294,11 @@ export const Lobby: React.FC<LobbyProps> = ({
                     value={player.name}
                     onChange={(e) => updatePlayerName(idx, e.target.value)}
                     maxLength={16}
-                    className="w-full px-3 py-1.5 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:border-amber-400 text-sm font-bold text-slate-800 outline-none transition"
+                    disabled={!canEditProfile(player)}
+                    className="w-full px-3 py-1.5 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:border-amber-400 text-sm font-bold text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-70"
                   />
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-                    {player.isBot ? 'Plays automatically' : 'Pass & Play'}
+                    {player.isBot ? 'Plays automatically' : canEditProfile(player) ? 'Pass & Play' : 'Shared player'}
                   </div>
                 </div>
               </div>

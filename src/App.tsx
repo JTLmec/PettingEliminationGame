@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   GamePhase,
   PetId,
@@ -82,6 +82,7 @@ export const App: React.FC = () => {
   const [revealData, setRevealData] = useState<RevealData | null>(null);
   const [winner, setWinner] = useState<Player | null>(null);
   const [winType, setWinType] = useState<'sweet_spot' | 'last_survivor'>('sweet_spot');
+  const roomSyncTimerRef = useRef<number | null>(null);
 
   const selectedPet: PetData = PETS[selectedPetId];
 
@@ -138,6 +139,9 @@ export const App: React.FC = () => {
       if (updatedRoom.game_state.activeSpots) setActiveSpots(updatedRoom.game_state.activeSpots);
       if (updatedRoom.game_state.activePlayerIndex !== undefined) setActivePlayerIndex(updatedRoom.game_state.activePlayerIndex);
       if (updatedRoom.game_state.phase) setPhase(updatedRoom.game_state.phase);
+      if (updatedRoom.game_state.winner !== undefined) setWinner(updatedRoom.game_state.winner ?? null);
+      if (updatedRoom.game_state.winType) setWinType(updatedRoom.game_state.winType);
+      if (updatedRoom.game_state.revealData !== undefined) setRevealData(updatedRoom.game_state.revealData ?? null);
     };
     const unsubscribe = subscribeToRoom(room.id, applyRoomUpdate);
     const refreshTimer = window.setInterval(() => {
@@ -204,7 +208,17 @@ export const App: React.FC = () => {
       const updatedPlayers = typeof nextPlayers === 'function'
         ? nextPlayers(currentPlayers)
         : nextPlayers;
-      if (room) void updateRoomPlayers(room.id, updatedPlayers);
+
+      if (room) {
+        if (roomSyncTimerRef.current) {
+          window.clearTimeout(roomSyncTimerRef.current);
+        }
+
+        roomSyncTimerRef.current = window.setTimeout(() => {
+          void updateRoomPlayers(room.id, updatedPlayers);
+        }, 250);
+      }
+
       return updatedPlayers;
     });
   };
@@ -298,6 +312,9 @@ export const App: React.FC = () => {
     if (phase !== 'PLAYING') return;
     if (room && activePlayer.id !== window.localStorage.getItem('petting-player-id')) return;
 
+    const resolvedSpot = activeSpots.find((s) => s.id === spot.id) ?? spot;
+    const resolvedOutcome = resolvedSpot.outcome;
+
     // Show animated reaching hand
     setReachingCoords({ x: spot.x, y: spot.y });
 
@@ -305,13 +322,13 @@ export const App: React.FC = () => {
       setReachingCoords(null);
 
       // Play pet reaction sound
-      sound.playPetVoice(selectedPetId, spot.outcome);
+      sound.playPetVoice(selectedPetId, resolvedOutcome);
 
       let message = '';
-      if (spot.outcome === 'sweet') {
+      if (resolvedOutcome === 'sweet') {
         setPetMood('euphoric');
         message = `PURE BLISS! ${selectedPet.name} purrs loudly, roll over, and melts into your hands! You found the Golden Sweet Spot!`;
-      } else if (spot.outcome === 'danger') {
+      } else if (resolvedOutcome === 'danger') {
         setPetMood('angry');
         if (selectedPetId === 'garfield_cat') {
           message = `SWAT! Garfield's murder mittens strike! He hissed and kicked you right out of the match!`;
@@ -331,12 +348,12 @@ export const App: React.FC = () => {
 
       // Update spot state
       const nextSpots = activeSpots.map((s) => {
-        if (s.id === spot.id) {
+        if (s.id === resolvedSpot.id) {
           return {
             ...s,
-            state: (spot.outcome === 'sweet'
+            state: (resolvedOutcome === 'sweet'
               ? 'picked_sweet'
-              : spot.outcome === 'danger'
+              : resolvedOutcome === 'danger'
               ? 'picked_danger'
               : 'picked_safe') as ActiveSpot['state'],
             pickedBy: activePlayer.id,
@@ -346,34 +363,69 @@ export const App: React.FC = () => {
       });
       setActiveSpots(nextSpots);
 
-      // Trigger Outcome Modal
-      setRevealData({
+      const reveal = {
         player: activePlayer,
-        spot,
-        outcome: spot.outcome,
+        spot: resolvedSpot,
+        outcome: resolvedOutcome,
         message,
-      });
+      };
+
+      // Trigger Outcome Modal for all clients in the room
+      setRevealData(reveal);
+      if (room) {
+        void updateRoomGameState(room, {
+          players,
+          activePlayerIndex,
+          activeSpots: nextSpots,
+          phase: 'PLAYING',
+          revealData: reveal,
+        });
+      }
     }, 600);
-  }, [phase, selectedPetId, selectedPet.name, activeSpots, activePlayer]);
+  }, [phase, selectedPetId, selectedPet.name, activeSpots, activePlayer, room, players, activePlayerIndex]);
 
   // Handle outcome modal dismissal and turn progression
   const handleDismissOutcome = () => {
     if (!revealData) return;
 
     const currentOutcome = revealData.outcome;
+    const latestPlayers = room?.game_state.players ?? players;
+    const latestActiveSpots = room?.game_state.activeSpots ?? activeSpots;
+
     setRevealData(null);
+    if (room) {
+      void updateRoomGameState(room, {
+        players: latestPlayers,
+        activePlayerIndex,
+        activeSpots: latestActiveSpots,
+        phase: 'PLAYING',
+        revealData: null,
+      });
+    }
     setPetMood('idle');
 
     // Case 1: Sweet spot found -> Sudden Death Victory!
     if (currentOutcome === 'sweet') {
-      setWinner(revealData.player);
+      const sweetWinner = revealData.player;
+      setWinner(sweetWinner);
       setWinType('sweet_spot');
       setPhase('GAME_OVER');
+      if (room) {
+        void updateRoomGameState(room, {
+          players: latestPlayers,
+          activePlayerIndex,
+          activeSpots: latestActiveSpots,
+          phase: 'GAME_OVER',
+          winner: sweetWinner,
+          winType: 'sweet_spot',
+          revealData: null,
+        });
+      }
       return;
     }
 
     // Case 2: Danger spot -> Player eliminated
-    let updatedPlayers = [...players];
+    let updatedPlayers = [...latestPlayers];
     if (currentOutcome === 'danger') {
       updatedPlayers = updatedPlayers.map((p) =>
         p.id === revealData.player.id ? { ...p, isEliminated: true } : p
@@ -383,23 +435,47 @@ export const App: React.FC = () => {
       // Check if only 1 player remains alive!
       const alivePlayers = updatedPlayers.filter((p) => !p.isEliminated);
       if (alivePlayers.length === 1) {
-        setWinner(alivePlayers[0]);
+        const lastSurvivor = alivePlayers[0];
+        setWinner(lastSurvivor);
         setWinType('last_survivor');
         setPhase('GAME_OVER');
+        if (room) {
+          void updateRoomGameState(room, {
+            players: updatedPlayers,
+            activePlayerIndex,
+            activeSpots: latestActiveSpots,
+            phase: 'GAME_OVER',
+            winner: lastSurvivor,
+            winType: 'last_survivor',
+            revealData: null,
+          });
+        }
         return;
       }
       if (alivePlayers.length === 0) {
         // Fallback draw/reset
-        setWinner(revealData.player);
+        const fallbackWinner = revealData.player;
+        setWinner(fallbackWinner);
         setWinType('last_survivor');
         setPhase('GAME_OVER');
+        if (room) {
+          void updateRoomGameState(room, {
+            players: updatedPlayers,
+            activePlayerIndex,
+            activeSpots: latestActiveSpots,
+            phase: 'GAME_OVER',
+            winner: fallbackWinner,
+            winType: 'last_survivor',
+            revealData: null,
+          });
+        }
         return;
       }
     }
 
     // Advance to next active (non-eliminated) player
     let nextIdx = (activePlayerIndex + 1) % updatedPlayers.length;
-    while (updatedPlayers[nextIdx].isEliminated) {
+    while (updatedPlayers[nextIdx]?.isEliminated) {
       nextIdx = (nextIdx + 1) % updatedPlayers.length;
     }
     setActivePlayerIndex(nextIdx);
@@ -407,8 +483,9 @@ export const App: React.FC = () => {
       void updateRoomGameState(room, {
         players: updatedPlayers,
         activePlayerIndex: nextIdx,
-        activeSpots,
+        activeSpots: latestActiveSpots,
         phase: 'PLAYING',
+        revealData: null,
       });
     }
   };
@@ -453,6 +530,16 @@ export const App: React.FC = () => {
     setRevealData(null);
     setPetMood('idle');
     setPhase('DICE_ROLL');
+    if (room) {
+      void updateRoomGameState(room, {
+        players: revivedPlayers,
+        activePlayerIndex: 0,
+        activeSpots: freshSpots,
+        phase: 'DICE_ROLL',
+        winner: null,
+        winType: 'sweet_spot',
+      });
+    }
   };
 
   // Return to full Lobby
@@ -467,6 +554,16 @@ export const App: React.FC = () => {
     setRevealData(null);
     setPetMood('idle');
     setPhase('LOBBY');
+    if (room) {
+      void updateRoomGameState(room, {
+        players: revivedPlayers,
+        activePlayerIndex: 0,
+        activeSpots: [],
+        phase: 'LOBBY',
+        winner: null,
+        winType: 'sweet_spot',
+      });
+    }
   };
 
   return (

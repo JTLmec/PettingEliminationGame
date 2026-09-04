@@ -22,6 +22,14 @@ export interface GameRoom {
     selectorPlayerId?: string;
     activePlayerIndex?: number;
     activeSpots?: ActiveSpot[];
+    winner?: Player | null;
+    winType?: 'sweet_spot' | 'last_survivor';
+    revealData?: {
+      player: Player;
+      spot: ActiveSpot;
+      outcome: 'sweet' | 'danger' | 'safe';
+      message: string;
+    } | null;
   };
 }
 
